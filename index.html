@@ -6,27 +6,11 @@
     <meta name="description" content="Biography of Prophet Muhammad (Peace Be Upon Him) - Historical and educational resource about the founder of Islam">
     <meta name="keywords" content="Muhammad, Prophet, Islam, Biography, History, PBUH">
     <title>Muhammad (Peace Be Upon Him) - Biography</title>
-    <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.29/dist/lenis.min.js"></script>
     <style>
-        html.lenis {
-            height: auto;
-        }
-
-        .lenis.lenis-smooth {
+        html {
             scroll-behavior: auto;
         }
 
-        .lenis.lenis-smooth [data-lenis-prevent] {
-            overscroll-behavior: contain;
-        }
-
-        .lenis.lenis-stopped {
-            overflow: hidden;
-        }
-
-        .lenis.lenis-scrolling iframe {
-            pointer-events: none;
-        }
         * {
             margin: 0;
             padding: 0;
@@ -40,10 +24,6 @@
             background-color: #f5f5f5;
             overflow-x: hidden;
         }
-        
-        body.lenis {
-            overflow: auto;
-        }
 
         .container {
             max-width: 900px;
@@ -51,7 +31,6 @@
             padding: 20px;
             background-color: #fff;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            will-change: transform;
         }
         
         section {
@@ -261,26 +240,99 @@
     </div>
 
     <script>
-        // Initialize Lenis smooth scrolling
-        const lenis = new Lenis({
-            duration: 1.2,
-            easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-            direction: 'vertical',
-            gestureDirection: 'vertical',
-            smooth: true,
-            mouseMultiplier: 1,
-            smoothTouch: false,
-            touchMultiplier: 2,
-            infinite: false,
-        });
+        // Self-contained kinetic smooth scrolling implementation
+        class KineticScroll {
+            constructor(options = {}) {
+                this.currentScroll = window.pageYOffset;
+                this.targetScroll = this.currentScroll;
+                this.velocity = 0;
+                this.isScrolling = false;
+                
+                this.init();
+            }
 
-        // Request animation frame for smooth scrolling
-        function raf(time) {
-            lenis.raf(time);
-            requestAnimationFrame(raf);
+            init() {
+                // Handle wheel events
+                window.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
+                
+                // Handle touch events for mobile
+                let touchStartY = 0;
+                window.addEventListener('touchstart', (e) => {
+                    touchStartY = e.touches[0].clientY;
+                }, { passive: true });
+                
+                window.addEventListener('touchmove', (e) => {
+                    const touchY = e.touches[0].clientY;
+                    const delta = touchStartY - touchY;
+                    this.targetScroll += delta;
+                    touchStartY = touchY;
+                    this.isScrolling = true;
+                }, { passive: true });
+                
+                // Start animation loop
+                this.animate();
+            }
+
+            handleWheel(e) {
+                e.preventDefault();
+                const delta = e.deltaY;
+                this.targetScroll += delta;
+                this.targetScroll = Math.max(0, Math.min(this.targetScroll, document.body.scrollHeight - window.innerHeight));
+                this.isScrolling = true;
+            }
+
+            animate() {
+                // Smooth interpolation with kinetic effect
+                const diff = this.targetScroll - this.currentScroll;
+                const distance = Math.abs(diff);
+                
+                if (distance > 0.5) {
+                    const speed = 0.1; // Adjust for smoothness
+                    this.currentScroll += diff * speed;
+                    this.velocity = diff * speed;
+                    this.isScrolling = true;
+                } else {
+                    this.currentScroll = this.targetScroll;
+                    this.velocity = 0;
+                    this.isScrolling = false;
+                }
+
+                window.scrollTo(0, this.currentScroll);
+                
+                // Emit scroll event for listeners
+                this.onScroll();
+                
+                requestAnimationFrame(() => this.animate());
+            }
+
+            onScroll() {
+                // Parallax effect on header
+                const header = document.querySelector('header');
+                if (header) {
+                    const parallaxSpeed = 0.5;
+                    header.style.transform = `translateY(${this.currentScroll * parallaxSpeed}px)`;
+                }
+
+                // Kinetic scale effect on container
+                const container = document.querySelector('.container');
+                if (container && Math.abs(this.velocity) > 0.5) {
+                    const scale = 1 + Math.min(Math.abs(this.velocity) * 0.0005, 0.02);
+                    container.style.transform = `scale(${scale})`;
+                    container.style.transition = 'transform 0.1s ease-out';
+                } else if (container) {
+                    container.style.transform = 'scale(1)';
+                }
+            }
+
+            scrollTo(target, options = {}) {
+                const targetY = typeof target === 'number' ? target : target.offsetTop + (options.offset || 0);
+                this.targetScroll = Math.max(0, Math.min(targetY, document.body.scrollHeight - window.innerHeight));
+                this.isScrolling = true;
+            }
         }
 
-        requestAnimationFrame(raf);
+        // Initialize kinetic scrolling
+        const kineticScroll = new KineticScroll();
 
         // Intersection Observer for scroll animations
         const observerOptions = {
@@ -302,15 +354,6 @@
             sections.forEach(section => {
                 observer.observe(section);
             });
-
-            // Add parallax effect to header
-            lenis.on('scroll', ({ scroll }) => {
-                const header = document.querySelector('header');
-                if (header) {
-                    const parallaxSpeed = 0.5;
-                    header.style.transform = `translateY(${scroll * parallaxSpeed}px)`;
-                }
-            });
         });
 
         // Smooth scroll to anchors
@@ -319,22 +362,9 @@
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {
-                    lenis.scrollTo(target, {
-                        offset: -20,
-                        duration: 1.5
-                    });
+                    kineticScroll.scrollTo(target, { offset: -20 });
                 }
             });
-        });
-
-        // Add kinetic energy effect on scroll stop
-        lenis.on('scroll', ({ velocity }) => {
-            const container = document.querySelector('.container');
-            if (Math.abs(velocity) > 0.5) {
-                container.style.transform = `scale(${1 + Math.abs(velocity) * 0.002})`;
-            } else {
-                container.style.transform = 'scale(1)';
-            }
         });
     </script>
 </body>
